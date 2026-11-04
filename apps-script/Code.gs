@@ -28,7 +28,7 @@ const FORMS = {
 };
 
 // Logos for the confirmation email, attached inline so they show even when remote images are blocked.
-const SITE = 'https://jameskellynet.github.io/ocp-innovation-village/';
+const SITE = 'https://opencomputeproject.github.io/ocp-innovation-village/';
 const LOGOS = { ocpLogo: SITE + 'assets/ocp-logo.png', ivLogo: SITE + 'assets/iv-logo.png' };
 
 // Column order in every Sheet. Matches the fields the form sends.
