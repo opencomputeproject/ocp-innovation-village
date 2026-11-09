@@ -28,7 +28,9 @@ apps-script/Code.gs        Backend receiver for all forms
 2. Edit `config.js`: `formId`, Summit name, dates, deadline, categories, timeline, eligibility.
 3. Update the `<title>` in that folder's `index.html`.
 4. Create the Summit's Google Sheet (blank) and add a line to `FORMS` in `apps-script/Code.gs` with its spreadsheet ID and closing time. In the Apps Script editor, run `setupSheets` once to add the headers and formatting, then redeploy the script as a new version (the URL stays the same).
-5. Set `endpoint` in `config.js` to the script URL and add the form to `index.html`.
+5. Set `endpoint` in `config.js` to the script URL and add the form to `index.html`, with the same deadline in the section's `data-closes`.
+
+At the deadline everything closes on its own: the script refuses late submissions and edits, the form page replaces the form with a closed notice, and the landing page marks the call CLOSED. No one needs to change anything.
 
 ## Deploy the backend (once)
 

@@ -16,11 +16,21 @@
   <p class="lede">Choose the Summit you would like to propose a live, hands-on demo station for.</p>
 </div></header>
 <main class="wrap" style="padding-block:40px 80px">
-  <section class="step">
+  <!-- data-closes = the same deadline as the form's config.js; the call shows as closed after it -->
+  <section class="step" data-closes="2027-01-12T07:59:00Z">
     <div class="stephead"><span class="stepno">OPEN</span><h2>2027 OCP EMEA Summit</h2></div>
-    <p class="stepnote">Hamburg, Germany · April 6–8, 2027 · Submissions close January 11, 2027 at 11:59 PM PT</p>
+    <p class="stepnote">Hamburg, Germany · April 6–8, 2027 · <span class="when">Submissions close January 11, 2027 at 11:59 PM PT</span></p>
     <a class="btn" href="forms/emea-2027-iv/" style="display:inline-block;text-decoration:none">Submit a demo</a>
   </section>
 </main>
+<script>
+/* Each call switches from OPEN to CLOSED on its own once its deadline passes. */
+document.querySelectorAll("[data-closes]").forEach(function(s){
+  if (new Date() <= new Date(s.dataset.closes)) return;
+  s.querySelector(".stepno").textContent = "CLOSED";
+  var w = s.querySelector(".when"); if (w) w.textContent = w.textContent.replace("Submissions close ", "Submissions closed ");
+  var b = s.querySelector(".btn"); b.textContent = "View the call"; b.classList.add("ghost");
+});
+</script>
 </body>
 </html>
