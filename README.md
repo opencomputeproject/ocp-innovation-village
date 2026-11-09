@@ -39,6 +39,14 @@ apps-script/Code.gs        Backend receiver for all forms
 
 While `endpoint` is empty, a form runs in preview mode and sends nothing.
 
+## Abuse protection
+
+The script guards the Sheet and the confirmation emails:
+
+- **Formula injection.** Answers that start with `=`, `+`, `-`, `@`, a tab or a line break are saved with a leading apostrophe, so Sheets keeps them as plain text instead of running them as formulas. The apostrophe is hidden in the Sheet and removed when a submitter opens their edit link.
+- **Rate limits.** Each email address can send 5 submissions or edits an hour, and the whole form accepts 20 a minute (`RATE` in `Code.gs`). Counts live in the script cache and expire on their own.
+- **Bots.** A hidden honeypot field silently drops automated posts.
+
 ## Sheet layout
 
 `setupSheets` creates a **Submissions** tab with one column per form answer, followed by staff columns (Review Status dropdown, Notes, Acceptance Notice Sent and Confirmed checkboxes). The form only ever writes the answer columns, so staff edits are never overwritten.

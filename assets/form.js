@@ -98,13 +98,13 @@ $("confirmBtn").onclick=async()=>{
   try{
     if(C.endpoint){
       const r=await fetch(C.endpoint,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(data)});
-      const j=await r.json(); if(!j.ok)throw new Error(j.error||"The server did not accept the submission."); ref=j.ref||ref;
+      const j=await r.json(); if(!j.ok){const e=new Error(j.error||"The server did not accept the submission.");e.limited=!!j.limited;throw e;} ref=j.ref||ref;
     }
     $("doneName").textContent=data.firstName;$("doneRef").textContent=ref;$("doneEmail").textContent=data.email;
     if(EDIT){$("doneTitle").textContent="Submission updated";$("doneLead").textContent="Your changes are saved. A confirmation of the updated submission is on its way to";}
     $("doneNotify").textContent=C.notifyLabel;$("demoNote").hidden=!!C.endpoint;
     $("review").hidden=true;$("done").hidden=false;window.scrollTo({top:$("done").offsetTop-20,behavior:"smooth"});
-  }catch(err){$("sendErr").textContent=`Your submission was not sent: ${err.message} Please try again in a minute.`;}
+  }catch(err){$("sendErr").textContent=`Your submission was not sent: ${err.message}`+(err.limited?"":" Please try again in a minute.");}
   finally{b.disabled=false;b.textContent=EDIT?"Save my changes":"Confirm my submission";}
 };
 $("againBtn").onclick=()=>{if(EDIT){location.href=location.pathname;return;}$("form").reset();$("presenters").innerHTML="";pCount=0;addPresenter();

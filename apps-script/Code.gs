@@ -57,6 +57,53 @@ const STATUS_OPTIONS = ['New', 'Under review', 'Accepted', 'Waitlist', 'Declined
 
 const LIMITS = { abstract: 1000, whyDemo: 500, takeaway: 500 };
 
+// Rate limits, counted for new submissions and edits alike (both write the Sheet and send an email).
+const RATE = { perEmailPerHour: 5, allPerMinute: 20 };
+
+// ---- Formula injection ----------------------------------------------------------------
+// A cell that starts with = + - @ (or a tab or line break) can run as a formula when the Sheet
+// is opened or exported. A leading apostrophe makes Sheets keep it as plain text; the apostrophe
+// is not shown and not part of the cell's value.
+const FORMULA_START = /^[=+\-@\t\r\n]/;
+function asText(v) {
+  return typeof v === 'string' && FORMULA_START.test(v) ? "'" + v : v;
+}
+// Reading back for the edit form: drop the apostrophe if a Sheet ever returns it.
+function fromCell(v) {
+  return typeof v === 'string' && v.charAt(0) === "'" && FORMULA_START.test(v.slice(1)) ? v.slice(1) : v;
+}
+
+// ---- Rate limiting ----------------------------------------------------------------------
+// Sliding windows kept in the script cache (entries expire on their own). Call inside the script lock.
+// Returns null when the submission may go ahead, or a reply object when it must wait.
+function rateLimited(email) {
+  const cache = CacheService.getScriptCache();
+  const now = Date.now();
+  const recent = (key, windowMs) => {
+    let list = [];
+    try { list = JSON.parse(cache.get(key) || '[]'); } catch (e) { list = []; }
+    return list.filter(t => now - t < windowMs);
+  };
+
+  const all = recent('rl:all', 60 * 1000);
+  if (all.length >= RATE.allPerMinute)
+    return { ok: false, error: "We're receiving a lot of submissions right now." };
+
+  const hash = Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, String(email || '').trim().toLowerCase()));
+  const key = 'rl:email:' + hash;
+  const mine = recent(key, 60 * 60 * 1000);
+  if (mine.length >= RATE.perEmailPerHour) {
+    const mins = Math.max(1, Math.ceil((Math.min.apply(null, mine) + 60 * 60 * 1000 - now) / 60000));
+    return { ok: false, limited: true, error: `This email address has reached the limit of ${RATE.perEmailPerHour} submissions or edits in an hour. Please try again in about ${mins} minute${mins === 1 ? '' : 's'}.` };
+  }
+
+  all.push(now); mine.push(now);
+  cache.put('rl:all', JSON.stringify(all), 120);
+  cache.put(key, JSON.stringify(mine), 3600);
+  return null;
+}
+
 /**
  * Run once from the Apps Script editor (select setupSheets → Run) after adding a Sheet to FORMS.
  * Safe to re-run: Sheets that already have headers are left alone.
@@ -177,7 +224,7 @@ function doGet(e) {
     const r = sh ? findRow(sh, q.ref) : 0;
     if (!r) return reply({ ok: false, error: 'We could not find this submission.' });
     const v = sh.getRange(r, 1, 1, COLUMNS.length).getValues()[0];
-    const get = h => v[COLUMNS.findIndex(c => c[0] === h)];
+    const get = h => fromCell(v[COLUMNS.findIndex(c => c[0] === h)]);
     return reply({ ok: true, ref: q.ref, data: {
       firstName: get('First Name'), lastName: get('Last Name'), email: get('Email'), company: get('Company Name'),
       jobTitle: get('Job Title'), title: get('Station / Demo Title'), category: get('Category'), abstract: get('Abstract'),
@@ -225,6 +272,9 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
+      const limited = rateLimited(d.email);
+      if (limited) return reply(limited);
+
       const ss = SpreadsheetApp.openById(form.sheetId);
       const sh = ss.getSheetByName(form.tab) || ss.insertSheet(form.tab);
       if (sh.getLastRow() === 0) sh.appendRow(COLUMNS.map(c => c[0]));
@@ -232,13 +282,13 @@ function doPost(e) {
         // Overwrite the answer columns (C onward); keep the original date, reference and staff columns.
         const r = findRow(sh, d._ref);
         if (!r) return reply({ ok: false, error: 'We could not find this submission.' });
-        const answers = COLUMNS.slice(2).map(c => c[1](d));
+        const answers = COLUMNS.slice(2).map(c => asText(c[1](d)));
         sh.getRange(r, 3, 1, answers.length).setValues([answers]);
         const notes = sh.getRange(r, COLUMNS.length + 2);   // Review Status, then Notes
         const stamp = 'Edited by submitter ' + Utilities.formatDate(new Date(), 'America/Los_Angeles', 'yyyy-MM-dd HH:mm') + ' PT';
         notes.setValue(notes.getValue() ? notes.getValue() + '\n' + stamp : stamp);
       } else {
-        const values = COLUMNS.map(c => c[1](d)).concat(['New']);   // Review Status starts as New
+        const values = COLUMNS.map(c => asText(c[1](d))).concat(['New']);   // Review Status starts as New
         sh.getRange(nextRow(sh), 1, 1, values.length).setValues([values]);
       }
     } finally {
